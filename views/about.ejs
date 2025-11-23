@@ -1,7 +1,23 @@
-<%- include("header") -%>
+<%- include("header") %>
 
-<h2>This is the about page</h2>
+<section class="info-card">
+  <h2>Sobre esta To-Do List</h2>
+  <p>
+    Esta aplicación tiene dos listas independientes:
+  </p>
+  <ul>
+    <li><strong>Lista general</strong>: para tareas personales, recados e ideas.</li>
+    <li><strong>Lista de trabajo</strong>: para estudios, proyectos y cosas del curro.</li>
+  </ul>
+  <p>
+    Está construida con <strong>Node.js</strong>, <strong>Express</strong> y
+    <strong>EJS</strong>. Las tareas se guardan en memoria usando un
+    <code>Map</code> y se muestran de forma segura para evitar ataques XSS.
+  </p>
+  <p>
+    Para marcar una tarea como hecha, solo tienes que marcar el checkbox: se
+    elimina de la lista automáticamente.
+  </p>
+</section>
 
-<p>jkhkjshjks dhfjkh sjkdfh sjkdf jksdfhjksfhjks dhjfk sjkdfjksdfhjkshdfjk sdjkf sjkdf jksd fjks djfkhsjkdf hsjkd fhs</p>
-
-<%- include("footer") -%>
+<%- include("footer") %>

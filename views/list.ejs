@@ -1,73 +1,75 @@
-<!-- This line includes the "header" partial, which contains common HTML header elements, such as stylesheets or navigation bars. -->
 <%- include("header") -%>
 
+  <!-- LISTA GENERAL -->
   <div class="box" id="heading">
-    <!-- Outputs the listTitle variable where the list's title is displayed in a header tag. -->
-    <h1>
-      <%= listTitle %>
-    </h1>
+    <h1>Lista general</h1>
   </div>
 
   <div class="box">
-    <!-- This is a loop using EJS templating. For each item in the newListItems array, the function is executed. -->
-    <% newListItems.forEach(function(item){ %>
+    <% generalItems.forEach(function(item){ %>
 
-      <!-- Each item is wrapped in a form with the action set to "/delete" and the method set to "post".
-         This means that when the form is submitted, it will send a POST request to the server at the "/delete" route. -->
       <form action="/delete" method="post">
         <div class="item">
-          <!-- This is a checkbox input. When the checkbox is clicked, the onChange event triggers form submission.
-             The value of the checkbox is set to the unique identifier (_id) of the item, which is needed to identify which item to delete. -->
-          <input type="checkbox" name="checkbox" value="<%=item._id%>" onChange="this.form.submit()">
-
-          <!-- This paragraph displays the name of the current item in the list. -->
-          <p>
-            <%=item.name%>
-          </p>
+          <input
+            type="checkbox"
+            name="checkbox"
+            value="<%= item.id %>"
+            onChange="this.form.submit()"
+          >
+          <p><%= item.name %></p>
         </div>
 
-        <!-- A hidden input field to send the listTitle along with the form so the server knows from which list the item is being deleted. -->
-        <input type="hidden" name="listName" value="<%= listTitle %>"></input>
+        <input type="hidden" name="listName" value="General">
       </form>
 
-      <!-- The loop ends here. -->
-      <% }) %>
+    <% }) %>
 
-        <!-- This form is for adding a new item to the list. -->
-        <form class="item" action="/" method="post">
-          <!-- An input field for the user to type a new item name. -->
-          <input type="text" name="newItem" placeholder="New Item" autocomplete="off">
+    <% if (generalItems.length === 0) { %>
+      <div class="item">
+        <p>No hay tareas generales. Añade la primera 🙂</p>
+      </div>
+    <% } %>
 
-          <!-- A submit button for the form to add a new item to the list. The value of the button is set to the listTitle. -->
-          <button type="submit" name="list" value="<%= listTitle %>">+</button>
-        </form>
+    <form class="item" action="/" method="post">
+      <input type="text" name="newItem" placeholder="New Item" autocomplete="off">
+      <button type="submit" name="list" value="General">+</button>
+    </form>
   </div>
 
-  <!-- This line includes the "footer" partial, which contains common HTML footer elements. -->
-  <%- include("footer") -%>
+  <!-- LISTA TRABAJO -->
+  <div class="box" id="heading">
+    <h1>Lista de trabajo</h1>
+  </div>
 
-    <!--
-    When a user checks the checkbox next to an item, the onChange event is fired because the state of the checkbox has changed.
-     The onChange event is set to submit the form it's contained in, which sends a POST request to the server's /delete route.
-      The server then processes this request, using the unique _id provided by the checkbox's value to identify and
-       delete the correct item from the database. The hidden input named listName is also sent along with the request, 
-       xso the server knows from which specific list the item is being deleted.
-  -->
+  <div class="box">
+    <% workItems.forEach(function(item){ %>
 
-    <!--
-    The this.form.submit() code is executed in the context of the input element that triggered the onChange event. 
-    In JavaScript, this refers to the object that is currently executing the code. When a checkbox's state is changed, 
-    this refers to that checkbox input element.
+      <form action="/delete" method="post">
+        <div class="item">
+          <input
+            type="checkbox"
+            name="checkbox"
+            value="<%= item.id %>"
+            onChange="this.form.submit()"
+          >
+          <p><%= item.name %></p>
+        </div>
 
-Now, this.form references the form element that the checkbox is a part of. So, when you write this.form.submit(), 
-you are telling the browser to submit the form that contains the checkbox that was just clicked. This doesn't refer to any
- other forms on the page, only the one that contains the checkbox that triggered the event.
+        <input type="hidden" name="listName" value="Trabajo">
+      </form>
 
-In your code, each checkbox input is wrapped in its own form element. Therefore, when the checkbox is clicked and
- this.form.submit() is called, it only submits the form that the checkbox is inside of, not any other form on the page.
-  The submit() method submits the form and sends the data to the server at the endpoint specified in the action attribute of
-   the form, which in this case is /delete.
+    <% }) %>
 
-The second form, which is used to add a new item, is separate and does not get submitted when a checkbox is clicked because 
-it's not part of that particular event's context. It would only be submitted when its own submit button is clicked.
-  -->
+    <% if (workItems.length === 0) { %>
+      <div class="item">
+        <p>No hay tareas de trabajo. Planifica tu día 💼</p>
+      </div>
+    <% } %>
+
+    <form class="item" action="/" method="post">
+      <input type="text" name="newItem" placeholder="New Item" autocomplete="off">
+      <button type="submit" name="list" value="Trabajo">+</button>
+    </form>
+  </div>
+
+<%- include("footer") -%>
