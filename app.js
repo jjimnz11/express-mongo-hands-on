@@ -21,6 +21,7 @@ app.use(express.static("public"));
 // ======== CONEXIÓN MONGODB ATLAS ========
 // La URI la tienes en el .env como MONGODB_ATLAS_URI
 const uri = process.env.MONGODB_ATLAS_URI;
+console.log("DEBUG Railway MONGODB_ATLAS_URI definida:", !!uri);
 
 mongoose
   .connect(uri)
