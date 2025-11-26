@@ -1,162 +1,162 @@
 //jshint esversion:8
 
-// Import necessary NPM modules required for the application
-const express = require("express"); // Express framework for handling HTTP requests
-const bodyParser = require("body-parser"); // Middleware to parse the body of HTTP requests
-const mongoose = require("mongoose"); // ODM library for MongoDB
-const _ = require("lodash"); // Utility library for manipulating and working with arrays, numbers, objects, strings, etc.
+require("dotenv").config(); // Para leer la URI de MongoDB Atlas desde .env
 
-// Initialize the express application
+const express = require("express");
+const bodyParser = require("body-parser");
+const mongoose = require("mongoose");
+const _ = require("lodash");
+
 const app = express();
 
-// Set EJS as the templating engine to dynamically render HTML pages
-app.set('view engine', 'ejs');
+// EJS como motor de plantillas
+app.set("view engine", "ejs");
 
-// Configure body-parser middleware to parse form data and serve static files from the "public" directory
+// Middlewares
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static("public"));
 
-// Connect to a MongoDB database named todolistDB with a deprecation fix for the URL parser
-//mongoose.connect("mongodb://localhost:27017/todolistDB", { useNewUrlParser: true });
-//const MONGODB_ATLAS_URI = "mongodb+srv://fjbanezares:Pepito123@cluster0.h5kauwo.mongodb.net/?retryWrites=true&w=majority"
+// =================== CONEXIÓN MONGODB ATLAS ===================
 
+// La URI viene de la variable de entorno MONGODB_ATLAS_URI
+// (definida en tu archivo .env y en Railway)
+const MONGODB_ATLAS_URI = process.env.MONGODB_ATLAS_URI;
 
+mongoose
+  .connect(MONGODB_ATLAS_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+  .then(() => console.log("Conectado a MongoDB Atlas ✅"))
+  .catch((err) => console.error("Error conectando a MongoDB Atlas ❌", err));
 
-const MONGODB_ATLAS_URI = "mongodb+srv://fjbanezares:Pepito123@cluster0.n87gd.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
-mongoose.connect(MONGODB_ATLAS_URI, { useNewUrlParser: true, useUnifiedTopology: true });
+// =================== ESQUEMAS Y MODELOS ===================
 
-
-// Define a schema for the items in the to-do list, consisting of a single field 'name'
+// Esquema para los items de la lista
 const itemsSchema = {
-    name: String
+  name: String
 };
 
-// Create a Mongoose model for items using the defined schema
+// Modelo para los items (colección "items")
 const Item = mongoose.model("Item", itemsSchema);
 
-// Instantiate default items to populate the to-do list initially
+// Items por defecto
 const item1 = new Item({ name: "Welcome to your todolist!" });
 const item2 = new Item({ name: "Hit the + button to add a new item." });
 const item3 = new Item({ name: "<-- Hit this to delete an item." });
-const defaultItems = [item1, item2, item3]; // Group default items into an array
 
-// Define a schema for custom lists which includes a name and an array of itemSchema
+const defaultItems = [item1, item2, item3];
+
+// Esquema para listas personalizadas (colección "lists")
 const listSchema = {
-    name: String,
-    items: [itemsSchema]
+  name: String,
+  items: [itemsSchema]
 };
 
-// Create a model for custom lists using the defined schema
 const List = mongoose.model("List", listSchema);
 
-// Handle GET requests to the home route "/" which displays the default to-do list
+// =================== RUTAS ===================
+
+// GET "/" -> lista por defecto "Today"
 app.get("/", async (req, res) => {
-    try {
-        // Attempt to find all items in the database
-        const foundItems = await Item.find({});
-        // If no items found, insert the default items and redirect to the home route
-        if (foundItems.length === 0) {
-            await Item.insertMany(defaultItems);
-            res.redirect("/");
-        } else {
-            // If items are found, render the 'list' EJS template with the found items
-            res.render("list", { listTitle: "Today", newListItems: foundItems });
-        }
-    } catch (err) {
-        // Log any errors and send a server error response
-        console.log(err);
-        res.status(500).send("Error retrieving items");
+  try {
+    const foundItems = await Item.find({});
+
+    if (foundItems.length === 0) {
+      await Item.insertMany(defaultItems);
+      return res.redirect("/");
     }
+
+    res.render("list", {
+      listTitle: "Today",
+      newListItems: foundItems
+    });
+  } catch (err) {
+    console.log(err);
+    res.status(500).send("Error retrieving items");
+  }
 });
 
-// Handle GET requests for custom list names. This allows users to create and view custom lists
+// GET "/:customListName" -> listas personalizadas (Work, Home, etc.)
 app.get("/:customListName", async (req, res) => {
-    // Capitalize the custom list name to maintain consistent naming convention
-    const customListName = _.capitalize(req.params.customListName);
+  const customListName = _.capitalize(req.params.customListName);
 
-    try {
-        // Check if a list with the custom name already exists
-        const foundList = await List.findOne({ name: customListName });
-        // If not, create a new list with the custom name and default items, then redirect to it
-        if (!foundList) {
-            const list = new List({
-                name: customListName,
-                items: defaultItems
-            });
-            await list.save();
-            res.redirect("/" + customListName);
-        } else {
-            // If the list exists, render it with its items
-            res.render("list", { listTitle: foundList.name, newListItems: foundList.items });
-        }
-    } catch (err) {
-        // Log any errors and send a server error response
-        console.log(err);
-        res.status(500).send("Error finding the list");
-    }
-});
+  try {
+    const foundList = await List.findOne({ name: customListName });
 
-// Handle POST requests to add a new item to either the default or a custom list
-app.post("/", async (req, res) => {
-    const itemName = req.body.newItem; // Extract the new item's name from the request body
-    const listName = req.body.list; // Determine which list to add the item to
-    const item = new Item({ name: itemName }); // Create a new item document
+    if (!foundList) {
+      // Si no existe, la creamos con los items por defecto
+      const list = new List({
+        name: customListName,
+        items: defaultItems
+      });
 
-    // If adding to the default 'Today' list, save the item and redirect to home
-    if (listName === "Today") {
-        await item.save();
-        res.redirect("/");
+      await list.save();
+      res.redirect("/" + customListName);
     } else {
-        // If adding to a custom list, find the list and push the new item to its items array
-        try {
-            const foundList = await List.findOne({ name: listName });
-            foundList.items.push(item);
-            await foundList.save();
-            res.redirect("/" + listName);
-        } catch (err) {
-            // Log any errors and send a server error response
-            // The code includes error handling for the case where there's an issue finding a custom list or saving the item. In such cases, 
-            // an error message is logged to the console, and a 500 server error response is sent to the client.
-            console.log(err);
-            res.status(500).send("Error saving the item");
-        }
+      // Si existe, la mostramos
+      res.render("list", {
+        listTitle: foundList.name,
+        newListItems: foundList.items
+      });
     }
+  } catch (err) {
+    console.log(err);
+    res.status(500).send("Error finding the list");
+  }
 });
 
-// Handle POST requests to delete an item from either the default or a custom list
+// POST "/" -> añadir item a "Today" o a una lista personalizada
+app.post("/", async (req, res) => {
+  const itemName = req.body.newItem;
+  const listName = req.body.list;
+
+  const item = new Item({ name: itemName });
+
+  try {
+    if (listName === "Today") {
+      await item.save();
+      res.redirect("/");
+    } else {
+      const foundList = await List.findOne({ name: listName });
+      foundList.items.push(item);
+      await foundList.save();
+      res.redirect("/" + listName);
+    }
+  } catch (err) {
+    console.log(err);
+    res.status(500).send("Error saving the item");
+  }
+});
+
+// POST "/delete" -> borrar item de "Today" o de una lista personalizada
 app.post("/delete", async (req, res) => {
-    const checkedItemId = req.body.checkbox; // Get the ID of the item to delete
-    const listName = req.body.listName; // Determine from which list to delete the item
+  const checkedItemId = req.body.checkbox; // id del item
+  const listName = req.body.listName;      // "Today" o nombre de la lista
 
-    try {
-        // If deleting from the default 'Today' list, delete the item by its ID and redirect to home
-        if (listName === "Today") {
-            await Item.findByIdAndDelete(checkedItemId);
-            res.redirect("/");
-        } else {
-            // If deleting from a custom list, update the list by pulling the item from its items array
-            await List.findOneAndUpdate(
-                { name: listName },
-                { $pull: { items: { _id: checkedItemId } } }
-            );
-            res.redirect("/" + listName);
-        }
-    } catch (err) {
-        // Log any errors and send a server error response
-        console.log(err);
-        res.status(500).send("Error deleting the item");
+  try {
+    if (listName === "Today") {
+      await Item.findByIdAndDelete(checkedItemId);
+      res.redirect("/");
+    } else {
+      await List.findOneAndUpdate(
+        { name: listName },
+        { $pull: { items: { _id: checkedItemId } } }
+      );
+      res.redirect("/" + listName);
     }
+  } catch (err) {
+    console.log(err);
+    res.status(500).send("Error deleting the item");
+  }
 });
 
-// Handle GET requests to the "about" page
+// Página About
 app.get("/about", (req, res) => {
-    res.render("about"); // Render the 'about' EJS template
+  res.render("about");
 });
 
-
+// =================== SERVIDOR ===================
 
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, function () {
-    console.log("Server started on port", PORT);
+  console.log("Server started on port", PORT);
 });

@@ -10,8 +10,10 @@
   "author": "Jesus",
   "license": "ISC",
   "dependencies": {
+    "dotenv": "^17.2.3",
     "ejs": "^3.1.10",
     "express": "^4.19.2",
-    "helmet": "^7.1.0"
+    "helmet": "^7.1.0",
+    "mongoose": "^9.0.0"
   }
 }
