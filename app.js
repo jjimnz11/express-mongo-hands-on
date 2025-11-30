@@ -8,7 +8,6 @@ const path = require("path");
 const mongoose = require("mongoose");
 
 const app = express();
-const PORT = process.env.PORT || 3000;
 
 // ======== CONFIGURACIÓN EJS Y STATIC ========
 
@@ -220,6 +219,8 @@ app.use((req, res) => {
     pageTitle: "Página no encontrada"
   });
 });
+
+const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
   console.log(`Server started on port ${PORT}`);
