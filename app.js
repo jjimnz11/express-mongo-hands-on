@@ -19,7 +19,7 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static("public"));
 
 // ======== CONEXIÓN MONGODB ATLAS ========
-// La URI la tienes en el .env como MONGODB_ATLAS_URI
+
 const uri = process.env.MONGODB_ATLAS_URI;
 console.log("DEBUG Railway MONGODB_ATLAS_URI definida:", !!uri);
 
@@ -37,7 +37,7 @@ const itemsSchema = {
 
 const Item = mongoose.model("Item", itemsSchema);
 
-// Colección "lists" -> listas personalizadas, usaremos una: "Trabajo"
+// Colección "lists" -> listas personalizadas (usaremos "Trabajo" + dinámicas tipo /Pepito)
 const listSchema = {
   name: String,
   items: [itemsSchema]
@@ -45,16 +45,16 @@ const listSchema = {
 
 const List = mongoose.model("List", listSchema);
 
-// Items por defecto para la lista general
+// Items por defecto para listas nuevas
 const defaultItems = [
   new Item({ name: "Bienvenido a tu ToDoList de Jesús ✨" }),
   new Item({ name: "Escribe una tarea y pulsa +" }),
   new Item({ name: "Marca la casilla para eliminarla" })
 ];
 
-// Asegurarnos de que hay datos iniciales
+// Asegurarnos de que hay datos iniciales en General y Trabajo
 async function ensureDefaultData() {
-  // Si la colección items está vacía, ponemos los tres por defecto
+  // Si la colección items está vacía, ponemos los tres por defecto en GENERAL
   const countItems = await Item.countDocuments({});
   if (countItems === 0) {
     await Item.insertMany(defaultItems);
@@ -69,7 +69,7 @@ async function ensureDefaultData() {
 
 // ================== RUTAS ==================
 
-// Mostrar LAS DOS listas en la misma página
+// Mostrar LAS DOS listas en la misma página (General + Trabajo)
 app.get("/", async (req, res) => {
   try {
     await ensureDefaultData();
@@ -101,10 +101,48 @@ app.get("/about", (req, res) => {
   res.render("about", { pageTitle: "Sobre esta app" });
 });
 
+// ====== NUEVO: LISTAS DINÁMICAS POR URL ( /Pepito, /Viajes, /Examenes, etc.) ======
+app.get("/:customListName", async (req, res) => {
+  const customListNameRaw = req.params.customListName;
+
+  // Para evitar problemas con /favicon.ico y rutas conocidas
+  if (customListNameRaw === "favicon.ico") {
+    return res.status(204).end();
+  }
+  if (["about", "work"].includes(customListNameRaw)) {
+    return res.redirect("/" + customListNameRaw);
+  }
+
+  // Capitalizamos un poco el nombre (Pepito, Viajes...)
+  const customListName =
+    customListNameRaw.charAt(0).toUpperCase() + customListNameRaw.slice(1);
+
+  try {
+    let foundList = await List.findOne({ name: customListName });
+
+    if (!foundList) {
+      // Si no existe, la creamos con los items por defecto
+      const list = new List({
+        name: customListName,
+        items: defaultItems
+      });
+      foundList = await list.save();
+    }
+
+    res.render("customList", {
+      listTitle: foundList.name,
+      newListItems: foundList.items
+    });
+  } catch (err) {
+    console.error("Error en GET /:customListName", err);
+    res.status(500).send("Error cargando la lista personalizada");
+  }
+});
+
 // ----------------- AÑADIR TAREA -----------------
 app.post("/", async (req, res) => {
   const itemName = req.body.newItem; // texto de la tarea
-  const listName = req.body.list;    // "General" o "Trabajo"
+  const listName = req.body.list;    // "General", "Trabajo" o cualquier nombre de lista dinámica
 
   if (!itemName || !listName) {
     return res.redirect("/");
@@ -117,17 +155,24 @@ app.post("/", async (req, res) => {
 
   try {
     if (listName === "General") {
-      // Guardamos en colección "items"
+      // Guardamos en colección "items" (lista general)
       await new Item({ name: text }).save();
-    } else if (listName === "Trabajo") {
-      // Añadimos al array items de la lista "Trabajo" en colección "lists"
+    } else {
+      // Trabajo o cualquier lista dinámica -> colección "lists"
       await List.findOneAndUpdate(
-        { name: "Trabajo" },
+        { name: listName },
         { $push: { items: { name: text } } },
         { upsert: true }
       );
     }
-    res.redirect("/");
+
+    // Si es General o Trabajo, volvemos a la home
+    if (listName === "General" || listName === "Trabajo") {
+      res.redirect("/");
+    } else {
+      // Si es una lista dinámica, volvemos a su URL /Pepito
+      res.redirect("/" + listName);
+    }
   } catch (err) {
     console.error("Error en POST / (add)", err);
     res.redirect("/");
@@ -137,7 +182,7 @@ app.post("/", async (req, res) => {
 // ----------------- BORRAR TAREA -----------------
 app.post("/delete", async (req, res) => {
   const checkedItemId = req.body.checkbox; // _id del item
-  const listName = req.body.listName;      // "General" o "Trabajo"
+  const listName = req.body.listName;      // "General", "Trabajo" o nombre de lista dinámica
 
   console.log("BORRANDO =>", listName, checkedItemId);
 
@@ -149,14 +194,20 @@ app.post("/delete", async (req, res) => {
     if (listName === "General") {
       // Borramos directamente de "items"
       await Item.findByIdAndDelete(checkedItemId);
-    } else if (listName === "Trabajo") {
-      // Borramos del array items de la lista "Trabajo"
+      res.redirect("/");
+    } else {
+      // Trabajo o cualquier lista dinámica -> borrar del array items en "lists"
       await List.findOneAndUpdate(
-        { name: "Trabajo" },
+        { name: listName },
         { $pull: { items: { _id: checkedItemId } } }
       );
+
+      if (listName === "Trabajo") {
+        res.redirect("/");
+      } else {
+        res.redirect("/" + listName);
+      }
     }
-    res.redirect("/");
   } catch (err) {
     console.error("Error en POST /delete", err);
     res.redirect("/");
@@ -170,6 +221,6 @@ app.use((req, res) => {
   });
 });
 
-app.listen(3000, function() {
-  console.log("Server started on port 3000");
+app.listen(PORT, () => {
+  console.log(`Server started on port ${PORT}`);
 });
